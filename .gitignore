@@ -1,0 +1,8 @@
+# input and output
+input/
+output/
+target/
+data/
+
+# .idea
+.idea/
