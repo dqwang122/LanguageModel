@@ -22,10 +22,9 @@ public class WordCount {
     private Text word = new Text();
 
     public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-        String line = value.toString();
-        StringTokenizer tokenizer = new StringTokenizer(line);
-        while (tokenizer.hasMoreTokens()) {
-            word.set(tokenizer.nextToken());
+        String[] words = value.toString().split("");
+        for(String w : words){
+            word.set(w);
             context.write(word, one);
         }
     }
@@ -46,7 +45,6 @@ public class WordCount {
  public static void main(String[] args) throws Exception {
     Configuration conf = new Configuration();
 
-    System.out.println("Hello world!");
 
     Job job = new Job(conf, "wordcount");
 
