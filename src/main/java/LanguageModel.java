@@ -3,9 +3,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.regex.*;
 
-import com.huaban.analysis.jieba.JiebaSegmenter;
-import com.huaban.analysis.jieba.SegToken;
-import com.huaban.analysis.jieba.JiebaSegmenter.SegMode;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.conf.*;
@@ -16,19 +13,19 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
-public class WordCount {
- public static List<String> GetChineseWord(String str_text) {
+public class LanguageModel {
+ public static String GetChineseWord(String str_text) {
 
-    List<String> wordList = new ArrayList<String>();
+    StringBuilder builder = new StringBuilder();
 
     // 0-9 or chinese words or Punctuation
-    String reg="([\u4e00-\u9fa5]+)";
+    String reg="([\uFF10-\uFF19|\u4e00-\u9fa5|\u3002\uff1b\uff0c\uff1a\u201c\u201d\uff08\uff09\u3001\uff1f\u300a\u300b]+)";
     Matcher matcher = Pattern.compile(reg).matcher(str_text);
     while(matcher.find()){
-        wordList.add(matcher.group());
+        builder.append(matcher.group());
     }
 
-    return wordList;
+    return builder.toString();
 }
 
  public static class Map extends Mapper<LongWritable, Text, Text, MapWritable> {
@@ -37,28 +34,26 @@ public class WordCount {
 
     public void map(LongWritable key, Text value, Context context)
             throws IOException, InterruptedException {
-        List<String> wordList = GetChineseWord(value.toString());
+        String words = GetChineseWord(value.toString());
         HashMap<String, MapWritable> stripes  = new HashMap<>();    // HashTable for (W1,W2)
 
-        for(String words : wordList) {
-            System.out.println(words.toString());
-            for (int i = 0; i < words.length() - 2; i++) {
-                String bigram = words.substring(i, i + 2);    // (W1,W2)
-                Text ch = new Text(words.substring(i + 2, i + 3));  // W3
-                MapWritable bigramList;     // (W1,W2) -> {W3:1,W3:3,....}
-                if (!stripes.containsKey(bigram)) {
-                    bigramList = new MapWritable();
-                    stripes.put(bigram, bigramList);
-                } else {
-                    bigramList = stripes.get(bigram);
-                }
-                IntWritable cnt_tmp = new IntWritable(1);
-                if (bigramList.containsKey(ch)) {
-                    IntWritable cnt = (IntWritable) bigramList.get(ch);
-                    cnt_tmp.set(cnt.get() + 1);
-                }
-                bigramList.put(ch, cnt_tmp);
+        for(int i = 0; i < words.length() - 2; i++){
+            String bigram = words.substring(i, i+2);    // (W1,W2)
+            Text ch = new Text(words.substring(i+2, i+3));  // W3
+            MapWritable bigramList;     // (W1,W2) -> {W3:1,W3:3,....}
+            if(!stripes.containsKey(bigram)){
+                bigramList = new MapWritable();
+                stripes.put(bigram, bigramList);
             }
+            else{
+                bigramList = stripes.get(bigram);
+            }
+            IntWritable cnt_tmp = new IntWritable(1);
+            if(bigramList.containsKey(ch)){
+                IntWritable cnt = (IntWritable) bigramList.get(ch);
+                cnt_tmp.set(cnt.get() + 1);
+            }
+            bigramList.put(ch, cnt_tmp);
         }
 
         // emit
@@ -69,6 +64,7 @@ public class WordCount {
  }
 
  private static class Combine extends Reducer<Text, MapWritable, Text, MapWritable> {
+
     public void reduce(Text key, Iterable<MapWritable> value, Context context)
             throws IOException, InterruptedException {
         MapWritable stripe = new MapWritable();
@@ -80,7 +76,7 @@ public class WordCount {
                 for (Writable w : val.keySet()) {
                     IntWritable cnt = (IntWritable)val.get(w);
                     if(stripe.containsKey((w))) {
-                        stripe.put(w, new IntWritable(cnt.get() + ((IntWritable)stripe.get((Text)w)).get()));
+                        stripe.put(w, new IntWritable(cnt.get() + ((IntWritable)stripe.get(w)).get()));
                     }
                     else {
                         stripe.put(w, cnt);
@@ -95,29 +91,28 @@ public class WordCount {
 
  public static class Reduce extends Reducer<Text, MapWritable, Text, Text> {
 
-//    public void reduce(Text key, Iterable<IntWritable> values, Context context)
-//      throws IOException, InterruptedException {
-//        int sum = 0;
-//        for (IntWritable val : values) {
-//            sum += val.get();
-//        }
-//        context.write(key, new IntWritable(sum));
-//    }
-
     public void reduce(Text key, Iterable<MapWritable> value, Context context)
             throws IOException, InterruptedException {
         HashMap<String, Integer> stripe = new HashMap<>();
+        double sum = 0;
 
         // for combining different mapper with the same key (W1, W2)
         for (MapWritable val : value) {
             if(!val.isEmpty()) {
+                // for W3
                 for (Writable w : val.keySet()) {
-                    int cnt = ((IntWritable)val.get((Text)w)).get();
-                    String wstr = ((Text)w).toString();
+                    int cnt = ((IntWritable)val.get(w)).get();
+                    String wstr = (w).toString();
+
+                    // record the total number of (W1,W2)
+                    sum += cnt;
+
                     if(stripe.containsKey((wstr))) {
                         cnt += stripe.get(wstr);
                     }
                     stripe.put(wstr, cnt);
+
+
                 }
             }
         }
@@ -125,7 +120,7 @@ public class WordCount {
         StringBuilder builder = new StringBuilder();
         if(stripe.size() > 0) {
             for (HashMap.Entry<String, Integer> e : stripe.entrySet()) {
-                builder.append(e.getKey() + ":" + e.getValue() + ";");
+                builder.append(e.getKey()).append(":").append(e.getValue()/sum).append(";");
             }
         }
 
@@ -138,7 +133,8 @@ public class WordCount {
     Configuration conf = new Configuration();
 
 
-    Job job = new Job(conf, "wordcount");
+    Job job = new Job(conf, "LanguageModel");
+    job.setJarByClass(LanguageModel.class);
 
     System.out.println("Hello world!");
 
