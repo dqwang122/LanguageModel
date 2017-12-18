@@ -94,7 +94,7 @@ public class LanguageModel {
     public void reduce(Text key, Iterable<MapWritable> value, Context context)
             throws IOException, InterruptedException {
         HashMap<String, Integer> stripe = new HashMap<>();
-        double sum = 0;
+//        double sum = 0;
 
         // for combining different mapper with the same key (W1, W2)
         for (MapWritable val : value) {
@@ -105,7 +105,7 @@ public class LanguageModel {
                     String wstr = (w).toString();
 
                     // record the total number of (W1,W2)
-                    sum += cnt;
+//                    sum += cnt;
 
                     if(stripe.containsKey((wstr))) {
                         cnt += stripe.get(wstr);
@@ -120,7 +120,7 @@ public class LanguageModel {
         StringBuilder builder = new StringBuilder();
         if(stripe.size() > 0) {
             for (HashMap.Entry<String, Integer> e : stripe.entrySet()) {
-                builder.append(e.getKey()).append(":").append(e.getValue()/sum).append(";");
+                builder.append(e.getKey()).append(":").append(e.getValue()).append(";");
             }
         }
 
