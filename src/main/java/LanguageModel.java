@@ -35,30 +35,33 @@ public class LanguageModel {
     public void map(LongWritable key, Text value, Context context)
             throws IOException, InterruptedException {
         String words = GetChineseWord(value.toString());
-        HashMap<String, MapWritable> stripes  = new HashMap<>();    // HashTable for (W1,W2)
+        HashMap<String, MapWritable> stripes  = new HashMap<>();    // HashTable for (W2)
 
         for(int i = 0; i < words.length() - 2; i++){
-            String bigram = words.substring(i, i+2);    // (W1,W2)
-            Text ch = new Text(words.substring(i+2, i+3));  // W3
-            MapWritable bigramList;     // (W1,W2) -> {W3:1,W3:3,....}
-            if(!stripes.containsKey(bigram)){
-                bigramList = new MapWritable();
-                stripes.put(bigram, bigramList);
+            String w1 = words.substring(i, i+1);    //w1
+            String w2 = words.substring(i + 1, i + 2);    // W2
+            Text w3 = new Text(words.substring(i+2, i+3));  // W3
+            MapWritable w2List;     // (W2) -> {W3:list of w1, W3: list of w1,....}
+            if(!stripes.containsKey(w2)){
+                w2List = new MapWritable();
+                stripes.put(w2, w2List);
             }
             else{
-                bigramList = stripes.get(bigram);
+                w2List = stripes.get(w2);
             }
-            IntWritable cnt_tmp = new IntWritable(1);
-            if(bigramList.containsKey(ch)){
-                IntWritable cnt = (IntWritable) bigramList.get(ch);
-                cnt_tmp.set(cnt.get() + 1);
+            String all_w1 = w1;
+            if(w2List.containsKey(w3)){
+                all_w1 = ((Text)w2List.get(w3)).toString();
+                if(!all_w1.contains(w1)){
+                    all_w1 += w1;
+                }
             }
-            bigramList.put(ch, cnt_tmp);
+            w2List.put(w3, new Text(all_w1));
         }
 
         // emit
-        for(String bigram : stripes.keySet()){
-            context.write(new Text(bigram), stripes.get(bigram));
+        for(String w2 : stripes.keySet()){
+            context.write(new Text(w2), stripes.get(w2));
         }
     }
  }
@@ -69,17 +72,25 @@ public class LanguageModel {
             throws IOException, InterruptedException {
         MapWritable stripe = new MapWritable();
 
-        // for combining local docs, each doc has a MapWritable with the same key (W1,W2)
+        // for combining local docs, each doc has a MapWritable with the same key (W2)
         for (MapWritable val : value) {
             if(!val.isEmpty()) {
                 // for each element W3
                 for (Writable w : val.keySet()) {
-                    IntWritable cnt = (IntWritable)val.get(w);
+//                    IntWritable cnt = (IntWritable)val.get(w);
+                    String new_w1 = ((Text)val.get(w)).toString();
                     if(stripe.containsKey((w))) {
-                        stripe.put(w, new IntWritable(cnt.get() + ((IntWritable)stripe.get(w)).get()));
+                        String all_w1 = ((Text)stripe.get(w)).toString();
+                        StringBuilder builder = new StringBuilder(all_w1);
+                        for(String s : new_w1.split("")){
+                            if(!all_w1.contains(s)){
+                                builder.append(s);
+                            }
+                        }
+                        stripe.put(w, new Text(builder.toString()));
                     }
                     else {
-                        stripe.put(w, cnt);
+                        stripe.put(w, new Text(new_w1));
                     }
                 }
             }
@@ -93,25 +104,29 @@ public class LanguageModel {
 
     public void reduce(Text key, Iterable<MapWritable> value, Context context)
             throws IOException, InterruptedException {
-        HashMap<String, Integer> stripe = new HashMap<>();
+        HashMap<String, String> stripe = new HashMap<>();
 //        double sum = 0;
 
-        // for combining different mapper with the same key (W1, W2)
+        // for combining different mapper with the same key (W2)
         for (MapWritable val : value) {
             if(!val.isEmpty()) {
                 // for W3
                 for (Writable w : val.keySet()) {
-                    int cnt = ((IntWritable)val.get(w)).get();
-                    String wstr = (w).toString();
-
-                    // record the total number of (W1,W2)
-//                    sum += cnt;
-
+                    String new_w1 = ((Text)val.get(w)).toString();
+                    String wstr = w.toString();
                     if(stripe.containsKey((wstr))) {
-                        cnt += stripe.get(wstr);
+                        String all_w1 = stripe.get(wstr);
+                        StringBuilder builder = new StringBuilder(all_w1);
+                        for(String s : new_w1.split("")){
+                            if(!all_w1.contains(s)){
+                                builder.append(s);
+                            }
+                        }
+                        stripe.put(wstr, builder.toString());
                     }
-                    stripe.put(wstr, cnt);
-
+                    else {
+                        stripe.put(wstr, new_w1);
+                    }
 
                 }
             }
@@ -119,7 +134,7 @@ public class LanguageModel {
 
         StringBuilder builder = new StringBuilder();
         if(stripe.size() > 0) {
-            for (HashMap.Entry<String, Integer> e : stripe.entrySet()) {
+            for (HashMap.Entry<String, String> e : stripe.entrySet()) {
                 builder.append(e.getKey()).append(":").append(e.getValue()).append(";");
             }
         }
