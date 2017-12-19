@@ -84,7 +84,7 @@ public class LanguageModel {
     }
  }
 
- private static class Combine extends Reducer<Text, MapWritable, Text, MapWritable> {
+    private static class Combine extends Reducer<Text, MapWritable, Text, MapWritable> {
 
     public void reduce(Text key, Iterable<MapWritable> value, Context context)
             throws IOException, InterruptedException {
@@ -117,7 +117,7 @@ public class LanguageModel {
     }
 }
 
- public static class Reduce extends Reducer<Text, MapWritable, Text, Text> {
+    public static class Reduce extends Reducer<Text, MapWritable, Text, Text> {
 
     public void reduce(Text key, Iterable<MapWritable> value, Context context)
             throws IOException, InterruptedException {
@@ -160,33 +160,33 @@ public class LanguageModel {
 
  }
 
- public static void main(String[] args) throws Exception {
-    Configuration conf = new Configuration();
+    public static void main(String[] args) throws Exception {
+        Configuration conf = new Configuration();
 
 
-    Job job = new Job(conf, "LanguageModel");
-    job.setJarByClass(LanguageModel.class);
+        Job job = new Job(conf, "LanguageModel");
+        job.setJarByClass(LanguageModel.class);
 
-    System.out.println("Hello world!");
+        System.out.println("Hello world!");
 
-    // set the type of output (key, Value)
-    job.setOutputKeyClass(Text.class);
-    job.setOutputValueClass(MapWritable.class);
+        // set the type of output (key, Value)
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(MapWritable.class);
 
-    // set Mapper and Reducer
-    job.setMapperClass(Map.class);
-    job.setCombinerClass(Combine.class);
-    job.setReducerClass(Reduce.class);
+        // set Mapper and Reducer
+        job.setMapperClass(Map.class);
+        job.setCombinerClass(Combine.class);
+        job.setReducerClass(Reduce.class);
 
-    // set Input and Output class
-    job.setInputFormatClass(TextInputFormat.class);
-    job.setOutputFormatClass(TextOutputFormat.class);
+        // set Input and Output class
+        job.setInputFormatClass(TextInputFormat.class);
+        job.setOutputFormatClass(TextOutputFormat.class);
 
-    // set Input and output path
-    FileInputFormat.addInputPath(job, new Path(args[0]));
-    FileOutputFormat.setOutputPath(job, new Path(args[1]));
+        // set Input and output path
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
-    job.waitForCompletion(true);
- }
+        job.waitForCompletion(true);
+    }
 
 }
