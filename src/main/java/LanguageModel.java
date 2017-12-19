@@ -14,7 +14,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 public class LanguageModel {
- public static String GetChineseWord(String str_text) {
+    public static String GetChineseWord(String str_text) {
 
     StringBuilder builder = new StringBuilder();
 
@@ -28,7 +28,7 @@ public class LanguageModel {
     return builder.toString();
 }
 
- public static class Map extends Mapper<LongWritable, Text, Text, MapWritable> {
+    public static class Map extends Mapper<LongWritable, Text, Text, MapWritable> {
 //    private final static IntWritable one = new IntWritable(1);
 //    private Text word = new Text();
 
@@ -37,26 +37,44 @@ public class LanguageModel {
         String words = GetChineseWord(value.toString());
         HashMap<String, MapWritable> stripes  = new HashMap<>();    // HashTable for (W2)
 
-        for(int i = 0; i < words.length() - 2; i++){
-            String w1 = words.substring(i, i+1);    //w1
-            String w2 = words.substring(i + 1, i + 2);    // W2
-            Text w3 = new Text(words.substring(i+2, i+3));  // W3
-            MapWritable w2List;     // (W2) -> {W3:list of w1, W3: list of w1,....}
-            if(!stripes.containsKey(w2)){
-                w2List = new MapWritable();
-                stripes.put(w2, w2List);
+        for(int i = 0; i < words.length(); i++){
+            String w = words.substring(i, i + 1);    // W2
+            MapWritable wList;     // (W2) -> {start:list of w1, end: list of w1,....}
+            if(!stripes.containsKey(w)){
+                wList = new MapWritable();
+                stripes.put(w, wList);
             }
             else{
-                w2List = stripes.get(w2);
+                wList = stripes.get(w);
             }
-            String all_w1 = w1;
-            if(w2List.containsKey(w3)){
-                all_w1 = ((Text)w2List.get(w3)).toString();
-                if(!all_w1.contains(w1)){
-                    all_w1 += w1;
+
+            // start
+            if(i != words.length() - 1) {
+                String w3 = words.substring(i + 1, i + 2);
+                String start = w3;
+                Text skey = new Text("start");
+                if (wList.containsKey(skey)) {
+                    start = ((Text)wList.get(skey)).toString();
+                    if(!start.contains(w3)){
+                        start += w3;
+                    }
                 }
+                wList.put(skey, new Text(start));
             }
-            w2List.put(w3, new Text(all_w1));
+
+            // end
+            if(i != 0) {
+                String w1 = words.substring(i - 1, i);
+                String end = w1;
+                Text ekey = new Text("end");
+                if (wList.containsKey(ekey)) {
+                    end = ((Text)wList.get(ekey)).toString();
+                    if(!end.contains(w1)){
+                        end += w1;
+                    }
+                }
+                wList.put(ekey, new Text(end));
+            }
         }
 
         // emit
@@ -75,9 +93,8 @@ public class LanguageModel {
         // for combining local docs, each doc has a MapWritable with the same key (W2)
         for (MapWritable val : value) {
             if(!val.isEmpty()) {
-                // for each element W3
-                for (Writable w : val.keySet()) {
-//                    IntWritable cnt = (IntWritable)val.get(w);
+                // for start and end
+                for (Writable w : val.keySet()) {   //w = "start"
                     String new_w1 = ((Text)val.get(w)).toString();
                     if(stripe.containsKey((w))) {
                         String all_w1 = ((Text)stripe.get(w)).toString();
@@ -105,12 +122,11 @@ public class LanguageModel {
     public void reduce(Text key, Iterable<MapWritable> value, Context context)
             throws IOException, InterruptedException {
         HashMap<String, String> stripe = new HashMap<>();
-//        double sum = 0;
 
         // for combining different mapper with the same key (W2)
         for (MapWritable val : value) {
             if(!val.isEmpty()) {
-                // for W3
+                // for start and key
                 for (Writable w : val.keySet()) {
                     String new_w1 = ((Text)val.get(w)).toString();
                     String wstr = w.toString();

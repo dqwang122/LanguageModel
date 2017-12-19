@@ -11,14 +11,15 @@ public class KNS {
 
 
 
-    public KNS(String str){
+    public KNS(String str,
+               String ModelPath){
         _str = str;
-        trigram = ReadFromFile.ReadTrigramFromFile("trigram.txt", str.substring(0,2));
-        trigram_end_with = ReadFromFile.ReadTrigramEndFromFile("trigram_end_with.txt", str.substring(1,2));
-        bigram = ReadFromFile.ReadBigramFromFile("bigram.txt", str.substring(1,2), str.substring(2,3));
-        System.out.println(trigram);
-        System.out.println(trigram_end_with);
-        System.out.println(bigram);
+        trigram = ReadFromFile.ReadTrigramFromFile(ModelPath+"LM_Trigram", str.substring(0,2));
+        trigram_end_with = ReadFromFile.ReadTrigramEndFromFile(ModelPath+ "LM_Trigram_end", str.substring(1,2));
+        bigram = ReadFromFile.ReadBigramFromFile(ModelPath+"LM_Bigram", str.substring(1,2), str.substring(2,3));
+//        System.out.println(trigram);
+//        System.out.println(trigram_end_with);
+//        System.out.println(bigram);
     }
 
 
