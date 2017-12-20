@@ -1,13 +1,21 @@
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 import java.util.regex.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.conf.*;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapreduce.*;
+import org.apache.hadoop.fs.*;
+
+import java.net.URI;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -27,6 +35,186 @@ public class LanguageModel {
 
     return builder.toString();
 }
+
+    public static List<String> ReadFromFile (String uri) throws Exception {
+        List<String> lines = new ArrayList<>();
+        Configuration conf = new Configuration();
+        FileSystem fs = FileSystem.get(URI.create(uri), conf);
+        InputStream fin = null;
+        BufferedReader bufferedReader = null;
+        try {
+            fin = fs.open(new Path(uri));
+            bufferedReader = new BufferedReader(new InputStreamReader(fin, "UTF-8"));
+            String lineTxt = null;
+
+            while((lineTxt = bufferedReader.readLine()) != null){
+                lines.add(lineTxt);
+            }
+
+        }
+        catch (Exception e) {
+            System.out.println("Read From Bigram File Wrong!");
+            e.printStackTrace();
+        }
+        finally {
+            if(bufferedReader != null) {
+                bufferedReader.close();
+            }
+        }
+        return lines;
+    }
+
+    public static HashMap<String, HashMap<String,Integer>> GetTrigramFromFile(String uri) throws Exception{
+        HashMap<String, HashMap<String, Integer>> TrigramTable = new HashMap<>();
+
+        String encoding = "UTF-8";
+        Configuration conf = new Configuration();
+        FileSystem fs = FileSystem.get(URI.create(uri), conf);
+        InputStream fin = null;
+        BufferedReader bufferedReader = null;
+        try {
+            fin = fs.open(new Path(uri));
+            bufferedReader = new BufferedReader(new InputStreamReader(fin, encoding));
+            String lineTxt = null;
+
+            while ((lineTxt = bufferedReader.readLine()) != null) {
+                HashMap<String, Integer> trigram = new HashMap<>();
+                String[] parts = lineTxt.split("\t");
+
+                TrigramTable.put(parts[0], trigram);
+
+                String[] wlist = parts[1].split(";");
+                for(String str : wlist){
+                    if(str!=null){
+                        String[] keyvalue = str.split(":");
+                        trigram.put(keyvalue[0], Integer.parseInt(keyvalue[1]));
+                    }
+                }
+
+            }
+
+            System.out.println("Read From Trigram File Success!");
+
+        }
+        catch (Exception e)
+        {
+            System.out.println("Read From Trigram File Wrong!");
+            e.printStackTrace();
+        }
+        finally {
+            if(bufferedReader != null) {
+                bufferedReader.close();
+            }
+        }
+        return TrigramTable;
+    }
+
+    public static HashMap<String, HashMap<String,Integer>> GetTrigramEndFromFile(String uri) throws  Exception{
+        HashMap<String, HashMap<String,Integer>> TrigramEndTable = new HashMap<>();
+
+        String encoding = "UTF-8";
+        Configuration conf = new Configuration();
+        FileSystem fs = FileSystem.get(URI.create(uri), conf);
+        InputStream fin = null;
+        BufferedReader bufferedReader = null;
+        try {
+            fin = fs.open(new Path(uri));
+            bufferedReader = new BufferedReader(new InputStreamReader(fin, encoding));
+            String lineTxt = null;
+
+
+            while ((lineTxt = bufferedReader.readLine()) != null) {
+                HashMap<String, Integer> trigram_end = new HashMap<>();
+                String[] parts = lineTxt.split("\t");
+
+                TrigramEndTable.put(parts[0], trigram_end);
+
+                String[] wlist = parts[1].split(";");
+                for(String str : wlist){
+                    if(str!=null){
+                        String[] keyvalue = str.split(":");
+                        trigram_end.put(keyvalue[0], Integer.parseInt(keyvalue[1]));
+                    }
+                }
+            }
+
+            System.out.println("Read From Trigram End Success!");
+
+            bufferedReader.close();
+        }
+        catch (Exception e)
+        {
+            System.out.println("Read From Trigram End Wrong!");
+            e.printStackTrace();
+        }
+        finally {
+            if(bufferedReader != null) {
+                bufferedReader.close();
+            }
+        }
+        return TrigramEndTable;
+    }
+
+    public static HashMap<String, HashMap<String,Integer>> GetBigramFromFile(String uri) throws  Exception{
+        HashMap<String, HashMap<String,Integer>> BigramTable = new HashMap<>();
+        int start = 1;
+
+        String encoding = "UTF-8";
+        Configuration conf = new Configuration();
+        FileSystem fs = FileSystem.get(URI.create(uri), conf);
+        InputStream fin = null;
+        BufferedReader bufferedReader = null;
+        try {
+            fin = fs.open(new Path(uri));
+            bufferedReader = new BufferedReader(new InputStreamReader(fin, encoding));
+            String lineTxt = null;
+
+            while ((lineTxt = bufferedReader.readLine()) != null) {
+                HashMap<String, Integer> bigram = new HashMap<>();
+                if(start == 1){
+                    String[] sum = lineTxt.split("\t");
+                    if(!sum[0].equals(sum[1])){
+                        System.out.println("Start_sum doesn't equal with end_sum");
+                    }
+                    try {
+                        BigramTable.put("Head", bigram);
+                        bigram.put("total", Integer.parseInt(sum[0]));
+                    }
+                    catch(Exception e){
+                        System.out.println("Lose the total number of bigrams");
+                        e.printStackTrace();
+                    }
+                    start = 0;
+                    continue;
+                }
+                String[] parts = lineTxt.split("\t");
+
+                BigramTable.put(parts[0], bigram);
+
+                String[] wlist = parts[1].split(";");
+                for(String str : wlist){
+                    String[] keyvalue = str.split(":");
+                    bigram.put(keyvalue[0],Integer.parseInt(keyvalue[1]));
+                }
+
+            }
+
+            System.out.println("Read From Bigram File Success!");
+
+            bufferedReader.close();
+        }
+        catch (Exception e)
+        {
+            System.out.println("Read From Bigram File Wrong!");
+            e.printStackTrace();
+        }
+        finally {
+            if(bufferedReader != null) {
+                bufferedReader.close();
+            }
+        }
+        return BigramTable;
+    }
 
     public static class Map_B extends Mapper<LongWritable, Text, Text, MapWritable> {
 //    private final static IntWritable one = new IntWritable(1);
@@ -468,7 +656,6 @@ public class LanguageModel {
 
  }
 
-
     public static class Map_BC extends Mapper<LongWritable, Text, Text, MapWritable> {
 //    private final static IntWritable one = new IntWritable(1);
 //    private Text word = new Text();
@@ -573,7 +760,6 @@ public class LanguageModel {
 
     }
 
-
     public static class Map_Q extends Mapper<LongWritable, Text, Text, Text> {
 
         public void map(LongWritable key, Text value, Context context)
@@ -624,23 +810,109 @@ public class LanguageModel {
 
     }
 
-    public static void main(String[] args) throws Exception {
-        Configuration conf = new Configuration();
+    public static class Map_C extends Mapper<LongWritable, Text, Text, Text> {
+        private HashMap<String, HashMap<String, Integer>> BigramTable;
+        private HashMap<String, HashMap<String, Integer>> TrigramEndTable;
+        private HashMap<String, HashMap<String, Integer>> TrigramTable;
+        public void setup(Context context) throws IOException{
+            try{
+                BigramTable = GetBigramFromFile("hdfs://10.141.200.205:9000/user/14307130360/resources/LM_Bigram");
+                TrigramEndTable = GetTrigramEndFromFile("hdfs://10.141.200.205:9000/user/14307130360/resources/LM_Trigram_end");
+                TrigramTable = GetTrigramFromFile("hdfs://10.141.200.205:9000/user/14307130360/resources/LM_Trigram");
 
+            }
+            catch (Exception e){
+                System.out.println("Read From File Wrong!");
+                e.printStackTrace();
+            }
+        }
+
+        public void map(LongWritable key, Text value, Context context)
+                throws IOException, InterruptedException {
+
+            String[] lines = value.toString().split("\n");
+            for(String lineTxt : lines) {
+                HashMap<String, Double> trigram = new HashMap<>();
+                String[] parts = lineTxt.split("\t");
+                List<String> wlist = Arrays.asList(parts[1].split(";"));
+
+                for(String str : wlist){
+                    if(str!=null){
+                        String[] keyvalue = str.split("=");
+
+                        KNS P = new KNS(parts[0] + keyvalue[0], TrigramTable,TrigramEndTable,BigramTable);
+                        trigram.put(keyvalue[0], P.GetP());
+                    }
+                }
+
+//                if(wlist.size() < 10){
+//                    // add bigram
+//                    List<String> bigramCandidate = ReadFromFile.ReadBigramBCFromFile(
+//                            "result/LM_Bigram_query",
+//                            parts[0].substring(1,2));
+//                    for(int i = 0; i < 10 - wlist.size() && i < bigramCandidate.size(); i ++){
+//                        KNS P = new KNS(parts[0] + bigramCandidate.get(i), TrigramTable,TrigramEndTable,BigramTable);
+//                        trigram.put(bigramCandidate.get(i), P.GetP());
+//                    }
+//                }
+
+                List<Map.Entry<String, Double>> infoIds = new ArrayList<>(trigram.entrySet());
+
+                Collections.sort(infoIds, new Comparator<Map.Entry<String, Double>>() {
+                    public int compare(Map.Entry<String, Double> o1,
+                                       Map.Entry<String, Double> o2) {
+                        return o2.getValue().compareTo(o1.getValue());
+                    }
+                });
+
+                StringBuilder builder = new StringBuilder();
+                for(int i = 0; i < 10 && i < trigram.size(); i++){
+                    builder.append(infoIds.get(i)).append(";");
+                }
+
+                context.write(new Text(parts[0]), new Text(builder.toString()));
+
+
+
+            }
+
+        }
+    }
+    public static class Reduce_C extends Reducer<Text, Text, Text, Text> {
+
+        public void reduce(Text key, Iterable<Text> value, Context context)
+                throws IOException, InterruptedException {
+            // for combining different mapper with the same key (W1)
+            for (Text val : value) {
+                context.write(key, val);
+            }
+        }
+
+    }
+
+
+    public static void main(String[] args) throws Exception {
+        long startTime = System.currentTimeMillis();    // start_time
+
+        Configuration conf = new Configuration();
 
         Job job = new Job(conf, "LanguageModel");
         job.setJarByClass(LanguageModel.class);
 
         System.out.println("Hello world!");
 
+        FileSystem fs = FileSystem.get(conf);
+        if (fs.exists(new Path(args[1])))
+            fs.delete(new Path(args[1]), true);
+
         // set the type of output (key, Value)
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(MapWritable.class);
 
         // set Mapper and Reducer
-        job.setMapperClass(Map_BC.class);
-        job.setCombinerClass(Combine_BC.class);
-        job.setReducerClass(Reduce_BC.class);
+        job.setMapperClass(Map_P.class);
+//        job.setCombinerClass(Combine_P.class);
+        job.setReducerClass(Reduce_P.class);
 
         // set Input and Output class
         job.setInputFormatClass(TextInputFormat.class);
@@ -651,6 +923,10 @@ public class LanguageModel {
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
         job.waitForCompletion(true);
+
+        long endTime = System.currentTimeMillis();    // end_time
+
+        System.out.println("RunTime:" + (endTime - startTime) + "ms");    // runtime
     }
 
 }

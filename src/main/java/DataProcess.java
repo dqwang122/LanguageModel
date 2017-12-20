@@ -2,6 +2,10 @@ import java.io.*;
 import java.util.*;
 import java.util.HashMap;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveTask;
+
 public class DataProcess {
 
     public static void CleanTrigramEnd(String filePath){
@@ -123,25 +127,39 @@ public class DataProcess {
         }
     }
 
-    public static void CreateCandidate(String filePath){
-        int add_sum = 0;
+    public static void CreateCandidate(String filePath, int low, int high){
+        int linecnt = 0;
         int cnt = 0;
+
+        String encoding = "UTF-8";
+        File file = new File(filePath);
+        File outfile = new File(filePath + "_candidate");
+
+        BufferedReader bufferedReader = null;
+        BufferedWriter bufferedWriter = null;
+
         try
         {
-            String encoding = "UTF-8";
-            File file = new File(filePath);
-            File outfile = new File(filePath + "_candidate");
+            InputStreamReader read = new InputStreamReader(
+                        new FileInputStream(file), encoding);// 考虑到编码格式
+            OutputStreamWriter write = new OutputStreamWriter(new FileOutputStream(outfile,true), encoding);
+
+            bufferedReader = new BufferedReader(read);
+            bufferedWriter = new BufferedWriter(write);
+
             if (file.isFile() && file.exists())
             {
-                InputStreamReader read = new InputStreamReader(
-                        new FileInputStream(file), encoding);// 考虑到编码格式
-                OutputStreamWriter write = new OutputStreamWriter(new FileOutputStream(outfile), encoding);
-                BufferedReader bufferedReader = new BufferedReader(read);
-                BufferedWriter bufferedWriter = new BufferedWriter(write);
+
                 String lineTxt = null;
 
 
-                while ((lineTxt = bufferedReader.readLine()) != null) {
+                while (linecnt < high && ((lineTxt = bufferedReader.readLine()) != null)) {
+                    if(linecnt < low){
+                        linecnt ++;
+                        continue;
+                    }
+                    linecnt ++;
+
                     HashMap<String, Double> trigram = new HashMap<>();
                     String[] parts = lineTxt.split("\t");
                     List<String> wlist = Arrays.asList(parts[1].split(";"));
@@ -150,19 +168,17 @@ public class DataProcess {
                         if(str!=null){
                             String[] keyvalue = str.split("=");
 
-                            KNS P = new KNS(parts[0] + keyvalue[0], "result/");
+                            KNS P = new KNS(parts[0] + keyvalue[0], "result/LM_Trigram", "result/LM_Trigram_end", "result/LM_Bigram");
                             trigram.put(keyvalue[0], P.GetP());
                         }
                     }
 
                     if(wlist.size() < 10){
-                        // add bigram
-                        add_sum += 1;
-                        List<String> bigramCandidate = ReadFromFile.ReadBigramBCFromFile(
+                        List<String> bigramCandidate = ReadFromFile.ReadCandidateFromFile(
                                 "result/LM_Bigram_query",
                                 parts[0].substring(1,2));
                         for(int i = 0; i < 10 - wlist.size() && i < bigramCandidate.size(); i ++){
-                            KNS P = new KNS(parts[0] + bigramCandidate.get(i), "result/");
+                            KNS P = new KNS(parts[0] + bigramCandidate.get(i), "result/LM_Trigram", "result/LM_Trigram_end", "result/LM_Bigram");
                             trigram.put(bigramCandidate.get(i), P.GetP());
                         }
                     }
@@ -181,12 +197,14 @@ public class DataProcess {
                         builder.append(infoIds.get(i)).append(";");
                     }
 
+
                     if(cnt % 1000 == 0){
                         System.out.println(builder.toString());
                     }
                     cnt ++;
 
                     bufferedWriter.write(builder.toString());
+//                    bufferedWriter.write("Hello world!");
                     bufferedWriter.newLine();
                 }
 
@@ -207,12 +225,13 @@ public class DataProcess {
             e.printStackTrace();
         }
 
-        System.out.println(add_sum);
     }
 
     public static void main(String[] args){
 //        CleanBigram("result/LM_Bigram_f");
 //        CleanTrigramEnd("result/LM_Trigram_end");
-        CreateCandidate("result/LM_Trigram_query");
+        CreateCandidate("result/LM_Trigram_query_ah", 0, 4000);
     }
-}
+};
+
+
