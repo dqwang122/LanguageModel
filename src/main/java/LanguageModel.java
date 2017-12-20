@@ -28,7 +28,7 @@ public class LanguageModel {
     return builder.toString();
 }
 
-    public static class Map extends Mapper<LongWritable, Text, Text, MapWritable> {
+    public static class Map_B extends Mapper<LongWritable, Text, Text, MapWritable> {
 //    private final static IntWritable one = new IntWritable(1);
 //    private Text word = new Text();
 
@@ -83,8 +83,7 @@ public class LanguageModel {
         }
     }
  }
-
-    private static class Combine extends Reducer<Text, MapWritable, Text, MapWritable> {
+    private static class Combine_B extends Reducer<Text, MapWritable, Text, MapWritable> {
 
     public void reduce(Text key, Iterable<MapWritable> value, Context context)
             throws IOException, InterruptedException {
@@ -116,8 +115,7 @@ public class LanguageModel {
         context.write(key, stripe);
     }
 }
-
-    public static class Reduce extends Reducer<Text, MapWritable, Text, Text> {
+    public static class Reduce_B extends Reducer<Text, MapWritable, Text, Text> {
 
     public void reduce(Text key, Iterable<MapWritable> value, Context context)
             throws IOException, InterruptedException {
@@ -160,6 +158,472 @@ public class LanguageModel {
 
  }
 
+    public static class Map_P extends Mapper<LongWritable, Text, Text, MapWritable> {
+//    private final static IntWritable one = new IntWritable(1);
+//    private Text word = new Text();
+
+    public void map(LongWritable key, Text value, Context context)
+            throws IOException, InterruptedException {
+        String words = GetChineseWord(value.toString());
+        HashMap<String, MapWritable> stripes  = new HashMap<>();    // HashTable for (W1,W2)
+
+        for(int i = 0; i < words.length() - 2; i++){
+            String bigram = words.substring(i, i+2);    // (W1,W2)
+            Text ch = new Text(words.substring(i+2, i+3));  // W3
+            MapWritable bigramList;     // (W1,W2) -> {W3:1,W3:3,....}
+            if(!stripes.containsKey(bigram)){
+                bigramList = new MapWritable();
+                stripes.put(bigram, bigramList);
+            }
+            else{
+                bigramList = stripes.get(bigram);
+            }
+            IntWritable cnt_tmp = new IntWritable(1);
+            if(bigramList.containsKey(ch)){
+                IntWritable cnt = (IntWritable) bigramList.get(ch);
+                cnt_tmp.set(cnt.get() + 1);
+            }
+            bigramList.put(ch, cnt_tmp);
+        }
+
+        // emit
+        for(String bigram : stripes.keySet()){
+            context.write(new Text(bigram), stripes.get(bigram));
+        }
+    }
+ }
+    private static class Combine_P extends Reducer<Text, MapWritable, Text, MapWritable> {
+
+    public void reduce(Text key, Iterable<MapWritable> value, Context context)
+            throws IOException, InterruptedException {
+        MapWritable stripe = new MapWritable();
+
+        // for combining local docs, each doc has a MapWritable with the same key (W1,W2)
+        for (MapWritable val : value) {
+            if(!val.isEmpty()) {
+                // for each element W3
+                for (Writable w : val.keySet()) {
+                    IntWritable cnt = (IntWritable)val.get(w);
+                    if(stripe.containsKey((w))) {
+                        stripe.put(w, new IntWritable(cnt.get() + ((IntWritable)stripe.get(w)).get()));
+                    }
+                    else {
+                        stripe.put(w, cnt);
+                    }
+                }
+            }
+        }
+
+        context.write(key, stripe);
+    }
+}
+    public static class Reduce_P extends Reducer<Text, MapWritable, Text, Text> {
+
+    public void reduce(Text key, Iterable<MapWritable> value, Context context)
+            throws IOException, InterruptedException {
+        HashMap<String, Integer> stripe = new HashMap<>();
+        double sum = 0;
+
+        // for combining different mapper with the same key (W1, W2)
+        for (MapWritable val : value) {
+            if(!val.isEmpty()) {
+                // for W3
+                for (Writable w : val.keySet()) {
+                    int cnt = ((IntWritable)val.get(w)).get();
+                    String wstr = (w).toString();
+
+                    // record the total number of (W1,W2)
+                    sum += cnt;
+
+                    if(stripe.containsKey((wstr))) {
+                        cnt += stripe.get(wstr);
+                    }
+                    stripe.put(wstr, cnt);
+
+
+                }
+            }
+        }
+
+        StringBuilder builder = new StringBuilder();
+        if(stripe.size() > 0) {
+            for (HashMap.Entry<String, Integer> e : stripe.entrySet()) {
+                builder.append(e.getKey()).append(":").append(e.getValue()/sum).append(";");
+            }
+        }
+
+        context.write(key, new Text(builder.toString()));
+    }
+
+ }
+
+    public static class Map_T extends Mapper<LongWritable, Text, Text, MapWritable> {
+//    private final static IntWritable one = new IntWritable(1);
+//    private Text word = new Text();
+
+    public void map(LongWritable key, Text value, Context context)
+            throws IOException, InterruptedException {
+        String words = GetChineseWord(value.toString());
+        HashMap<String, MapWritable> stripes  = new HashMap<>();    // HashTable for (W1,W2)
+
+        for(int i = 0; i < words.length() - 2; i++){
+            String bigram = words.substring(i, i+2);    // (W1,W2)
+            Text ch = new Text(words.substring(i+2, i+3));  // W3
+            MapWritable bigramList;     // (W1,W2) -> {W3:1,W3:3,....}
+            if(!stripes.containsKey(bigram)){
+                bigramList = new MapWritable();
+                stripes.put(bigram, bigramList);
+            }
+            else{
+                bigramList = stripes.get(bigram);
+            }
+            IntWritable cnt_tmp = new IntWritable(1);
+            if(bigramList.containsKey(ch)){
+                IntWritable cnt = (IntWritable) bigramList.get(ch);
+                cnt_tmp.set(cnt.get() + 1);
+            }
+            bigramList.put(ch, cnt_tmp);
+        }
+
+        // emit
+        for(String bigram : stripes.keySet()){
+            context.write(new Text(bigram), stripes.get(bigram));
+        }
+    }
+ }
+    private static class Combine_T extends Reducer<Text, MapWritable, Text, MapWritable> {
+
+    public void reduce(Text key, Iterable<MapWritable> value, Context context)
+            throws IOException, InterruptedException {
+        MapWritable stripe = new MapWritable();
+
+        // for combining local docs, each doc has a MapWritable with the same key (W1,W2)
+        for (MapWritable val : value) {
+            if(!val.isEmpty()) {
+                // for each element W3
+                for (Writable w : val.keySet()) {
+                    IntWritable cnt = (IntWritable)val.get(w);
+                    if(stripe.containsKey((w))) {
+                        stripe.put(w, new IntWritable(cnt.get() + ((IntWritable)stripe.get(w)).get()));
+                    }
+                    else {
+                        stripe.put(w, cnt);
+                    }
+                }
+            }
+        }
+
+        context.write(key, stripe);
+    }
+}
+    public static class Reduce_T extends Reducer<Text, MapWritable, Text, Text> {
+
+    public void reduce(Text key, Iterable<MapWritable> value, Context context)
+            throws IOException, InterruptedException {
+        HashMap<String, Integer> stripe = new HashMap<>();
+//        double sum = 0;
+
+        // for combining different mapper with the same key (W1, W2)
+        for (MapWritable val : value) {
+            if(!val.isEmpty()) {
+                // for W3
+                for (Writable w : val.keySet()) {
+                    int cnt = ((IntWritable)val.get(w)).get();
+                    String wstr = (w).toString();
+
+                    // record the total number of (W1,W2)
+//                    sum += cnt;
+
+                    if(stripe.containsKey((wstr))) {
+                        cnt += stripe.get(wstr);
+                    }
+                    stripe.put(wstr, cnt);
+
+
+                }
+            }
+        }
+
+        StringBuilder builder = new StringBuilder();
+        if(stripe.size() > 0) {
+            for (HashMap.Entry<String, Integer> e : stripe.entrySet()) {
+                builder.append(e.getKey()).append(":").append(e.getValue()).append(";");
+            }
+        }
+
+        context.write(key, new Text(builder.toString()));
+    }
+
+ }
+
+    public static class Map_TE extends Mapper<LongWritable, Text, Text, MapWritable> {
+//    private final static IntWritable one = new IntWritable(1);
+//    private Text word = new Text();
+
+    public void map(LongWritable key, Text value, Context context)
+            throws IOException, InterruptedException {
+        String words = GetChineseWord(value.toString());
+        HashMap<String, MapWritable> stripes  = new HashMap<>();    // HashTable for (W2)
+
+        for(int i = 0; i < words.length() - 2; i++){
+            String w1 = words.substring(i, i+1);    //w1
+            String w2 = words.substring(i + 1, i + 2);    // W2
+            Text w3 = new Text(words.substring(i+2, i+3));  // W3
+            MapWritable w2List;     // (W2) -> {W3:list of w1, W3: list of w1,....}
+            if(!stripes.containsKey(w2)){
+                w2List = new MapWritable();
+                stripes.put(w2, w2List);
+            }
+            else{
+                w2List = stripes.get(w2);
+            }
+            String all_w1 = w1;
+            if(w2List.containsKey(w3)){
+                all_w1 = ((Text)w2List.get(w3)).toString();
+                if(!all_w1.contains(w1)){
+                    all_w1 += w1;
+                }
+            }
+            w2List.put(w3, new Text(all_w1));
+        }
+
+        // emit
+        for(String w2 : stripes.keySet()){
+            context.write(new Text(w2), stripes.get(w2));
+        }
+    }
+ }
+    private static class Combine_TE extends Reducer<Text, MapWritable, Text, MapWritable> {
+        public void reduce(Text key, Iterable<MapWritable> value, Context context)
+            throws IOException, InterruptedException {
+        MapWritable stripe = new MapWritable();
+
+        // for combining local docs, each doc has a MapWritable with the same key (W2)
+        for (MapWritable val : value) {
+            if(!val.isEmpty()) {
+                // for each element W3
+                for (Writable w : val.keySet()) {
+//                    IntWritable cnt = (IntWritable)val.get(w);
+                    String new_w1 = ((Text)val.get(w)).toString();
+                    if(stripe.containsKey((w))) {
+                        String all_w1 = ((Text)stripe.get(w)).toString();
+                        StringBuilder builder = new StringBuilder(all_w1);
+                        for(String s : new_w1.split("")){
+                            if(!all_w1.contains(s)){
+                                builder.append(s);
+                            }
+                        }
+                        stripe.put(w, new Text(builder.toString()));
+                    }
+                    else {
+                        stripe.put(w, new Text(new_w1));
+                    }
+                }
+            }
+        }
+
+        context.write(key, stripe);
+    }
+}
+    public static class Reduce_TE extends Reducer<Text, MapWritable, Text, Text> {
+        public void reduce(Text key, Iterable<MapWritable> value, Context context)
+                throws IOException, InterruptedException {
+            HashMap<String, String> stripe = new HashMap<>();
+    //        double sum = 0;
+
+            // for combining different mapper with the same key (W2)
+            for (MapWritable val : value) {
+                if(!val.isEmpty()) {
+                    // for W3
+                    for (Writable w : val.keySet()) {
+                        String new_w1 = ((Text)val.get(w)).toString();
+                        String wstr = w.toString();
+                        if(stripe.containsKey((wstr))) {
+                            String all_w1 = stripe.get(wstr);
+                            StringBuilder builder = new StringBuilder(all_w1);
+                            for(String s : new_w1.split("")){
+                                if(!all_w1.contains(s)){
+                                    builder.append(s);
+                                }
+                            }
+                            stripe.put(wstr, builder.toString());
+                        }
+                        else {
+                            stripe.put(wstr, new_w1);
+                        }
+
+                    }
+                }
+            }
+
+            StringBuilder builder = new StringBuilder();
+            if(stripe.size() > 0) {
+                for (HashMap.Entry<String, String> e : stripe.entrySet()) {
+                    builder.append(e.getKey()).append(":").append(e.getValue()).append(";");
+                }
+            }
+
+            context.write(key, new Text(builder.toString()));
+        }
+
+ }
+
+
+    public static class Map_BC extends Mapper<LongWritable, Text, Text, MapWritable> {
+//    private final static IntWritable one = new IntWritable(1);
+//    private Text word = new Text();
+
+    public void map(LongWritable key, Text value, Context context)
+            throws IOException, InterruptedException {
+        String words = GetChineseWord(value.toString());
+        HashMap<String, MapWritable> stripes  = new HashMap<>();    // HashTable for (W1,W2)
+
+        for(int i = 0; i < words.length() - 1; i++){
+            String w1 = words.substring(i, i+1);    // (W1)
+            Text w2 = new Text(words.substring(i+1, i+2));  // W2
+            MapWritable wList;     // (W1,W2) -> {W3:1,W3:3,....}
+            if(!stripes.containsKey(w1)){
+                wList = new MapWritable();
+                stripes.put(w1, wList);
+            }
+            else{
+                wList = stripes.get(w1);
+            }
+            IntWritable cnt_tmp = new IntWritable(1);
+            if(wList.containsKey(w2)){
+                IntWritable cnt = (IntWritable) wList.get(w2);
+                cnt_tmp.set(cnt.get() + 1);
+            }
+            wList.put(w2, cnt_tmp);
+        }
+
+        // emit
+        for(String bigram : stripes.keySet()){
+            context.write(new Text(bigram), stripes.get(bigram));
+        }
+    }
+ }
+    private static class Combine_BC extends Reducer<Text, MapWritable, Text, MapWritable> {
+
+    public void reduce(Text key, Iterable<MapWritable> value, Context context)
+            throws IOException, InterruptedException {
+        MapWritable stripe = new MapWritable();
+
+        // for combining local docs, each doc has a MapWritable with the same key (W1)
+        for (MapWritable val : value) {
+            if(!val.isEmpty()) {
+                // for each element W2
+                for (Writable w : val.keySet()) {
+                    IntWritable cnt = (IntWritable)val.get(w);
+                    if(stripe.containsKey((w))) {
+                        stripe.put(w, new IntWritable(cnt.get() + ((IntWritable)stripe.get(w)).get()));
+                    }
+                    else {
+                        stripe.put(w, cnt);
+                    }
+                }
+            }
+        }
+
+        context.write(key, stripe);
+    }
+}
+    public static class Reduce_BC extends Reducer<Text, MapWritable, Text, Text> {
+
+        public void reduce(Text key, Iterable<MapWritable> value, Context context)
+                throws IOException, InterruptedException {
+            HashMap<String, Integer> stripe = new HashMap<>();
+
+            // for combining different mapper with the same key (W1)
+            for (MapWritable val : value) {
+                if (!val.isEmpty()) {
+                    // for W2
+                    for (Writable w : val.keySet()) {
+                        int cnt = ((IntWritable) val.get(w)).get();
+                        String wstr = (w).toString();
+
+                        if (stripe.containsKey((wstr))) {
+                            cnt += stripe.get(wstr);
+                        }
+                        stripe.put(wstr, cnt);
+
+
+                    }
+                }
+            }
+
+            List<Map.Entry<String, Integer>> infoIds = new ArrayList<>(stripe.entrySet());
+
+            Collections.sort(infoIds, new Comparator<Map.Entry<String, Integer>>() {
+                public int compare(Map.Entry<String, Integer> o1,
+                                   Map.Entry<String, Integer> o2) {
+                    return (o2.getValue()- o1.getValue());
+                }
+            });
+
+            StringBuilder builder = new StringBuilder();
+            if (stripe.size() > 0) {
+                for (int i = 0; i < 10 && i < stripe.size(); i++) {
+                    builder.append(infoIds.get(i)).append(";");
+                }
+            }
+
+            context.write(key, new Text(builder.toString()));
+        }
+
+    }
+
+
+    public static class Map_Q extends Mapper<LongWritable, Text, Text, Text> {
+
+        public void map(LongWritable key, Text value, Context context)
+                throws IOException, InterruptedException {
+            String[] lines = value.toString().split("\n");
+            for(String lineTxt : lines) {
+                HashMap<String, Integer> trigram = new HashMap<>();
+                String[] parts = lineTxt.split("\t");
+                String[] wlist = parts[1].split(";");
+                for (String str : wlist) {
+                    if (str != null) {
+                        String[] keyvalue = str.split(":");
+                        trigram.put(keyvalue[0], Integer.parseInt(keyvalue[1]));
+                    }
+                }
+
+                List<Map.Entry<String, Integer>> infoIds = new ArrayList<>(trigram.entrySet());
+
+                Collections.sort(infoIds, new Comparator<Map.Entry<String, Integer>>() {
+                    public int compare(Map.Entry<String, Integer> o1,
+                                       Map.Entry<String, Integer> o2) {
+                        return (o2.getValue() - o1.getValue());
+                    }
+                });
+
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < 10 && i < trigram.size(); i++) {
+                    builder.append(infoIds.get(i)).append(";");
+                }
+
+                // emit
+                context.write(new Text(parts[0]), new Text(builder.toString()));
+            }
+
+
+        }
+ }
+    public static class Reduce_Q extends Reducer<Text, Text, Text, Text> {
+
+        public void reduce(Text key, Iterable<Text> value, Context context)
+                throws IOException, InterruptedException {
+            HashMap<String, Integer> stripe = new HashMap<>();
+            // for combining different mapper with the same key (W1)
+            for (Text val : value) {
+                context.write(key, val);
+            }
+        }
+
+    }
+
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
 
@@ -174,9 +638,9 @@ public class LanguageModel {
         job.setOutputValueClass(MapWritable.class);
 
         // set Mapper and Reducer
-        job.setMapperClass(Map.class);
-        job.setCombinerClass(Combine.class);
-        job.setReducerClass(Reduce.class);
+        job.setMapperClass(Map_BC.class);
+        job.setCombinerClass(Combine_BC.class);
+        job.setReducerClass(Reduce_BC.class);
 
         // set Input and Output class
         job.setInputFormatClass(TextInputFormat.class);

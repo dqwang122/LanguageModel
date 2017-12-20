@@ -165,4 +165,46 @@ public class ReadFromFile {
         return bigram;
     }
 
+    public static List<String> ReadBigramBCFromFile(String filePath, String prefix){
+        List<String> bigram = new ArrayList<>();
+        try
+        {
+            String encoding = "UTF-8";
+            File file = new File(filePath);
+            if (file.isFile() && file.exists())
+            {
+                InputStreamReader read = new InputStreamReader(
+                        new FileInputStream(file), encoding);// 考虑到编码格式
+                BufferedReader bufferedReader = new BufferedReader(read);
+                String lineTxt = null;
+
+                 while ((lineTxt = bufferedReader.readLine()) != null) {
+                    if(lineTxt.startsWith(prefix)){
+                        String[] parts = lineTxt.split("\t");
+                        String[] wlist = parts[1].split(";");
+                        for(String str : wlist){
+                            if(str!=null){
+                                String[] keyvalue = str.split("=");
+                                bigram.add(keyvalue[0]);
+                            }
+                        }
+                        break;
+                    }
+                }
+                bufferedReader.close();
+                read.close();
+            }
+            else
+            {
+                System.out.println("File doesn't exist!");
+            }
+        }
+        catch (Exception e)
+        {
+            System.out.println("Read From Bigram File Wrong!");
+            e.printStackTrace();
+        }
+        return bigram;
+    }
+
 }

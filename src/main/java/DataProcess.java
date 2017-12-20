@@ -123,8 +123,96 @@ public class DataProcess {
         }
     }
 
+    public static void CreateCandidate(String filePath){
+        int add_sum = 0;
+        int cnt = 0;
+        try
+        {
+            String encoding = "UTF-8";
+            File file = new File(filePath);
+            File outfile = new File(filePath + "_candidate");
+            if (file.isFile() && file.exists())
+            {
+                InputStreamReader read = new InputStreamReader(
+                        new FileInputStream(file), encoding);// 考虑到编码格式
+                OutputStreamWriter write = new OutputStreamWriter(new FileOutputStream(outfile), encoding);
+                BufferedReader bufferedReader = new BufferedReader(read);
+                BufferedWriter bufferedWriter = new BufferedWriter(write);
+                String lineTxt = null;
+
+
+                while ((lineTxt = bufferedReader.readLine()) != null) {
+                    HashMap<String, Double> trigram = new HashMap<>();
+                    String[] parts = lineTxt.split("\t");
+                    List<String> wlist = Arrays.asList(parts[1].split(";"));
+
+                    for(String str : wlist){
+                        if(str!=null){
+                            String[] keyvalue = str.split("=");
+
+                            KNS P = new KNS(parts[0] + keyvalue[0], "result/");
+                            trigram.put(keyvalue[0], P.GetP());
+                        }
+                    }
+
+                    if(wlist.size() < 10){
+                        // add bigram
+                        add_sum += 1;
+                        List<String> bigramCandidate = ReadFromFile.ReadBigramBCFromFile(
+                                "result/LM_Bigram_query",
+                                parts[0].substring(1,2));
+                        for(int i = 0; i < 10 - wlist.size() && i < bigramCandidate.size(); i ++){
+                            KNS P = new KNS(parts[0] + bigramCandidate.get(i), "result/");
+                            trigram.put(bigramCandidate.get(i), P.GetP());
+                        }
+                    }
+
+                    List<Map.Entry<String, Double>> infoIds = new ArrayList<>(trigram.entrySet());
+
+                    Collections.sort(infoIds, new Comparator<Map.Entry<String, Double>>() {
+                        public int compare(Map.Entry<String, Double> o1,
+                                           Map.Entry<String, Double> o2) {
+                            return o2.getValue().compareTo(o1.getValue());
+                        }
+                    });
+
+                    StringBuilder builder = new StringBuilder(parts[0]+"\t");
+                    for(int i = 0; i < 10 && i < trigram.size(); i++){
+                        builder.append(infoIds.get(i)).append(";");
+                    }
+
+                    if(cnt % 1000 == 0){
+                        System.out.println(builder.toString());
+                    }
+                    cnt ++;
+
+                    bufferedWriter.write(builder.toString());
+                    bufferedWriter.newLine();
+                }
+
+                bufferedReader.close();
+                read.close();
+
+                bufferedWriter.close();
+                write.close();
+            }
+            else
+            {
+                System.out.println("File doesn't exist!");
+            }
+        }
+        catch (Exception e)
+        {
+            System.out.println("Read From Trigram End Wrong!");
+            e.printStackTrace();
+        }
+
+        System.out.println(add_sum);
+    }
+
     public static void main(String[] args){
-        CleanBigram("result/LM_Bigram_f");
-        CleanTrigramEnd("result/LM_Trigram_end");
+//        CleanBigram("result/LM_Bigram_f");
+//        CleanTrigramEnd("result/LM_Trigram_end");
+        CreateCandidate("result/LM_Trigram_query");
     }
 }
