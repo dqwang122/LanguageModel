@@ -93,7 +93,7 @@ public class DataProcess {
                             start_sum += keyvalue[1].length();
                             line.append(keyvalue[0]).append(":").append(keyvalue[1].length()).append(";");
                         }
-                        if(str.startsWith("start")){
+                        if(str.startsWith("end")){
                             String[] keyvalue = str.split(":");
                             end_sum += keyvalue[1].length();
                             line.append(keyvalue[0]).append(":").append(keyvalue[1].length()).append(";");
@@ -228,9 +228,9 @@ public class DataProcess {
     }
 
     public static void main(String[] args){
-//        CleanBigram("result/LM_Bigram_f");
+        CleanBigram("result/LM_Bigram_hadoop");
 //        CleanTrigramEnd("result/LM_Trigram_end");
-        CreateCandidate("result/LM_Trigram_query_ah", 0, 4000);
+//        CreateCandidate("result/LM_Trigram_query_ah", 3600, 4000);
     }
 };
 

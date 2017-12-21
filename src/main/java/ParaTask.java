@@ -32,7 +32,7 @@ public class ParaTask extends RecursiveAction  {
 
     public static void main(String[] args) throws ExecutionException, InterruptedException {
 
-        String filepath = "result/LM_Trigram_query_ah";
+        String filepath = "result/LM_Trigram_query_ai";
 
         // 1. 创建任务
         ParaTask sumTask = new ParaTask(filepath, 0, 4000);

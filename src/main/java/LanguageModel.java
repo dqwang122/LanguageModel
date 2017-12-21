@@ -890,6 +890,86 @@ public class LanguageModel {
 
     }
 
+    public static class Map_PE extends Mapper<LongWritable, Text, Text, Text> {
+//    private final static IntWritable one = new IntWritable(1);
+//    private Text word = new Text();
+
+    public void map(LongWritable key, Text value, Context context)
+            throws IOException, InterruptedException {
+        String words = GetChineseWord(value.toString());
+
+        for(int i = 0; i < words.length() - 2; i++){
+            String bigram = words.substring(i, i+2);    // (W1,W2)
+            Text ch = new Text(words.substring(i+2, i+3));  // W3
+            context.write(new Text(bigram), ch);
+        }
+
+    }
+ }
+    private static class Combine_PE extends Reducer<Text, Text, Text, MapWritable> {
+
+    public void reduce(Text key, Iterable<Text> value, Context context)
+            throws IOException, InterruptedException {
+        MapWritable stripe = new MapWritable();
+
+        // for combining local docs, each doc has a MapWritable with the same key (W1,W2)
+        for (Text val : value) {
+            if(val.getLength()!=0) {
+                // for each element W3
+                IntWritable cnt = new IntWritable(1);
+                if(stripe.containsKey((val))) {
+                    stripe.put(val, new IntWritable(cnt.get() + ((IntWritable)stripe.get(val)).get()));
+                }
+                else {
+                    stripe.put(val, cnt);
+                }
+
+            }
+        }
+
+        context.write(key, stripe);
+    }
+}
+    public static class Reduce_PE extends Reducer<Text, MapWritable, Text, Text> {
+
+    public void reduce(Text key, Iterable<MapWritable> value, Context context)
+            throws IOException, InterruptedException {
+        HashMap<String, Integer> stripe = new HashMap<>();
+        double sum = 0;
+
+        // for combining different mapper with the same key (W1, W2)
+        for (MapWritable val : value) {
+            if(!val.isEmpty()) {
+                // for W3
+                for (Writable w : val.keySet()) {
+                    int cnt = ((IntWritable)val.get(w)).get();
+                    String wstr = (w).toString();
+
+                    // record the total number of (W1,W2)
+                    sum += cnt;
+
+                    if(stripe.containsKey((wstr))) {
+                        cnt += stripe.get(wstr);
+                    }
+                    stripe.put(wstr, cnt);
+
+
+                }
+            }
+        }
+
+        StringBuilder builder = new StringBuilder();
+        if(stripe.size() > 0) {
+            for (HashMap.Entry<String, Integer> e : stripe.entrySet()) {
+                builder.append(e.getKey()).append(":").append(e.getValue()/sum).append(";");
+            }
+        }
+
+        context.write(key, new Text(builder.toString()));
+    }
+
+ }
+
 
     public static void main(String[] args) throws Exception {
         long startTime = System.currentTimeMillis();    // start_time
@@ -907,12 +987,12 @@ public class LanguageModel {
 
         // set the type of output (key, Value)
         job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(MapWritable.class);
+        job.setOutputValueClass(Text.class);
 
         // set Mapper and Reducer
-        job.setMapperClass(Map_P.class);
-//        job.setCombinerClass(Combine_P.class);
-        job.setReducerClass(Reduce_P.class);
+        job.setMapperClass(Map_PE.class);
+        job.setCombinerClass(Combine_PE.class);
+        job.setReducerClass(Reduce_PE.class);
 
         // set Input and Output class
         job.setInputFormatClass(TextInputFormat.class);
