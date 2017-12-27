@@ -12,10 +12,16 @@ public class Query {
         String str = null;
         int precision = 0;
 
-        System.out.println("Choose Prediction Mode: 1. (default)fast; 2. precision");
+        System.out.println("Choose Prediction Mode: 1. (default)fast; 2. precise");
         str = br.readLine();
-        if(str.equals("2")){
+        if(str.length() == 0 || str.equals("1")){
+            precision = 0;
+        }
+        else if(str.equals("2")){
             precision = 1;
+        }
+        else{
+            precision = 0;
         }
 
         while(true) {
