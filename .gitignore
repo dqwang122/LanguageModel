@@ -3,6 +3,7 @@ input/
 output/
 target/
 data/
+result/
 
 # .idea
 .idea/
